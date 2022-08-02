@@ -110,10 +110,7 @@ class Rocket(object):
             return "engine"
         n = n.replace(' ', '-')
 
-        if len(n) == 1:
-            if n == '-':
-                return "engine"
-        return n
+        return "engine" if len(n) == 1 and n == '-' else n
 
     @property
     def length(self):
@@ -181,10 +178,7 @@ class Stage(object):
             return "engine"
         n = n.replace(' ', '-')
 
-        if len(n) == 1:
-            if n == '-':
-                return "engine"
-        return n
+        return "engine" if len(n) == 1 and n == '-' else n
 
 
 class Component(object):
@@ -220,10 +214,9 @@ class Component(object):
         """
 
         for tag in self.tags:
-            if type(tag) is dict:
-                if tag['class'] == newclass:
-                    tag['tags'].append(newtag)
-                    return
+            if type(tag) is dict and tag['class'] == newclass:
+                tag['tags'].append(newtag)
+                return
 
         self.tags.append({'class': newclass, 'tags': [newtag]})
 
@@ -232,7 +225,7 @@ class Component(object):
         """**[kg]** The total *dry mass* of this component, **including all
         subcomponents**.
         """
-        return self._mass + sum([c.mass for c in self.components])
+        return self._mass + sum(c.mass for c in self.components)
 
     @mass.setter
     def mass(self, m):
@@ -285,10 +278,7 @@ class Component(object):
             return "engine"
         n = n.replace(' ', '-')
 
-        if len(n) == 1:
-            if n == '-':
-                return "engine"
-        return n
+        return "engine" if len(n) == 1 and n == '-' else n
 
 
 class Mass(Component):
@@ -657,9 +647,7 @@ class Engine(object):
         if self._length is not None:
             return self._length
 
-        # if no length is set directly, report it being the length of the system
-        l = sum([tank['length'] for tank in self.tanks])
-        return l
+        return sum(tank['length'] for tank in self.tanks)
 
     @length.setter
     def length(self, l):
@@ -673,9 +661,7 @@ class Engine(object):
             return self._diameter
 
         # if no diameter is set directly, report it being the max diameter of the system
-        if self.tanks:
-            return max([tank['diameter'] for tank in self.tanks])
-        return 0
+        return max(tank['diameter'] for tank in self.tanks) if self.tanks else 0
 
     @diameter.setter
     def diameter(self, val):
@@ -689,9 +675,7 @@ class Engine(object):
         """
         if self._Isp is not None:
             return self._Isp
-        if self.m_prop > 0:
-            return self.I_total/(self.m_prop * 9.80665)
-        return 0
+        return self.I_total/(self.m_prop * 9.80665) if self.m_prop > 0 else 0
 
     @Isp.setter
     def Isp(self, val):
@@ -711,10 +695,8 @@ class Engine(object):
         if self._Isp and self._thrust_avg:
             return self.I_total / self.V_e
 
-        if self._m_fuel is None and self._m_ox is None:
-            return 0
         if self._m_fuel is None:
-            return self._m_ox
+            return 0 if self._m_ox is None else self._m_ox
         if self._m_ox is None:
             return self._m_fuel
 
@@ -730,13 +712,8 @@ class Engine(object):
         Either computed from a thrust curve, or can be set directly to use in
         computing desired performance.
         """
-        # if we know the burntime and total impulse then we can compute
-        # otherwise return the value stored in _thrust_avg
-        # other-otherwise give up (return 0)
         if not self.thrustcurve:
-            if self._thrust_avg is not None:
-                return self._thrust_avg
-            return 0
+            return self._thrust_avg if self._thrust_avg is not None else 0
         return self.I_total / self.t_burn
 
     @thrust_avg.setter
@@ -771,10 +748,7 @@ class Engine(object):
             return self._thrust_avg * self._t_burn
 
         # compute from ISP and mass
-        if self._Isp:
-            return self.m_prop * self.V_e
-
-        return 0
+        return self.m_prop * self.V_e if self._Isp else 0
 
     @I_total.setter
     def I_total(self, val):
@@ -811,15 +785,12 @@ class Engine(object):
         """**[N]** Peak thrust during a nominal burn.
         """
         if self.thrustcurve:
-            return max([t['thrust'] for t in self.thrustcurve])
+            return max(t['thrust'] for t in self.thrustcurve)
 
         if self._thrust_peak is not None:
             return self._thrust_peak
 
-        if self._thrust_avg is not None:
-            return self._thrust_avg
-
-        return 0
+        return self._thrust_avg if self._thrust_avg is not None else 0
 
     @thrust_peak.setter
     def thrust_peak(self, val):
@@ -831,9 +802,7 @@ class Engine(object):
         loaded mass of the engine system and the empty weight. Often an
         important figure of merit in designing a rocket.
         """
-        if self.m_init > 0:
-            return (self.m_prop / self.m_init) * 100.0
-        return 0
+        return (self.m_prop / self.m_init) * 100.0 if self.m_init > 0 else 0
 
     @m_frac.setter
     def m_frac(self, val):
@@ -854,7 +823,7 @@ class Engine(object):
     def m_init(self):
         """**[kg]** Initial weight of the engine system, including propellent.
         """
-        m_tanks = sum([tank['mass'] for tank in self.tanks])
+        m_tanks = sum(tank['mass'] for tank in self.tanks)
         return self.m_prop + m_tanks + self._m_system
 
     @property
@@ -870,9 +839,7 @@ class Engine(object):
         nar_i = int(log(self.I_total/2.5)/log(2))
 
         # ASCII math :)
-        if nar_i < 26:
-            return chr(66 + nar_i)
-        return 'A' + chr(66 + nar_i - 26)
+        return chr(66 + nar_i) if nar_i < 26 else f'A{chr(66 + nar_i - 26)}'
 
     @property
     def nar_percent(self):
@@ -892,9 +859,7 @@ class Engine(object):
 
         :rtype: boolean
         """
-        if self.I_total > 0:
-            return True
-        return False
+        return self.I_total > 0
 
     @property
     def name_slug(self):
@@ -922,7 +887,4 @@ class Engine(object):
             return "engine"
         n = n.replace(' ', '-')
 
-        if len(n) == 1:
-            if n == '-':
-                return "engine"
-        return n
+        return "engine" if len(n) == 1 and n == '-' else n

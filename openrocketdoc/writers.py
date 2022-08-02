@@ -24,9 +24,7 @@ class Document(object):
         """
 
         # All must have name and type
-        c = {'name': component.name}
-        c['type'] = component.__class__.__name__
-
+        c = {'name': component.name, 'type': component.__class__.__name__}
         # All components have optional tags
         if component.tags:
             c['tags'] = component.tags
@@ -42,7 +40,10 @@ class Document(object):
             c['length'] = component.length
             c['diameter'] = component.diameter
             if component.color:
-                c['color'] = '['+str(component.color[0])+','+str(component.color[1])+','+str(component.color[2])+']'
+                c[
+                    'color'
+                ] = f'[{str(component.color[0])},{str(component.color[1])},{str(component.color[2])}]'
+
 
         elif type(component) is rdoc.Bodytube:
             c['mass'] = component.component_mass
@@ -53,7 +54,10 @@ class Document(object):
             if component.surface_roughness > 0:
                 c['surface'] = component.surface_roughness
             if component.color:
-                c['color'] = '['+str(component.color[0])+','+str(component.color[1])+','+str(component.color[2])+']'
+                c[
+                    'color'
+                ] = f'[{str(component.color[0])},{str(component.color[1])},{str(component.color[2])}]'
+
 
         elif type(component) is rdoc.Finset:
             c['fin'] = self._component_dict(component.components[0])
@@ -96,8 +100,7 @@ class Document(object):
 
             doc['rocket']['stages'] = []
             for stage in ordoc.stages:
-                s = {'name': stage.name}
-                s['components'] = []
+                s = {'name': stage.name, 'components': []}
                 for component in stage.components:
                     s['components'].append(self._component_dict(component))
                 doc['rocket']['stages'].append(s)
@@ -116,11 +119,7 @@ class SVG(object):
 
     def __init__(self, rocket, page='A4'):
 
-        if page == 'A4':
-            self.paper = self.A4
-        else:
-            self.paper = self.A4
-
+        self.paper = self.A4
         # DPI:
         self.MM2PX = self.paper['px'][0] / float(self.paper['mm'][0])
 
@@ -173,8 +172,7 @@ class SVG(object):
     def _px(self, m):
         """Go from meters to pixels"""
         mm = m * 1000 * self.scalefactor
-        px = mm * self.MM2PX
-        return px
+        return mm * self.MM2PX
 
     def _render_path(self, points):
         return "M " + " ".join(["%0.3f,%0.3f" % (self._px(p[0]), self._px(p[1])) for p in points])
@@ -182,10 +180,7 @@ class SVG(object):
     def _draw_scale(self):
         """Draw a scale bar in the lower left hand corner"""
 
-        if self.scalefactor >= 0.5:
-            unit = 0.1
-            unit_name = "10 cm"
-        elif self.scalefactor > 0.5:
+        if self.scalefactor >= 0.5 or self.scalefactor > 0.5:
             unit = 0.1
             unit_name = "10 cm"
         elif self.scalefactor > 0.05:
