@@ -51,35 +51,34 @@ class RaspEngine(FilelikeLoader):
             if line[0] == ';':
                 if not start_data:
                     comments += line[1:] + "\n"
-            else:
-                if not start_data:
-                    # This is the first data line, has metadata
-
-                    # RASP engine data is space-delimited
+            elif start_data:
+                # Thrustcuve data:
+                if any(char.isdigit() for char in line):
                     fields = line.split(' ')
+                    time = float(fields[0].strip())
+                    thrust = float(fields[1].strip())
+                    self.engine.thrustcurve.append({'t': time, 'thrust': thrust})
 
-                    # Fields are positional
-                    self.engine.name = fields[0]
-                    self.engine.manufacturer = fields[6].strip()
-                    self.engine.m_prop = float(fields[4])
+            else:
+                # This is the first data line, has metadata
 
-                    # build a "tank" the size of the solid motor
-                    self.engine.tanks.append({
-                        "mass": float(fields[5]) - float(fields[4]),  # initial weight - propellent weight
-                        "length": float(fields[2]) / 1000.0,          # convert to meters
-                        "diameter": float(fields[1]) / 1000.0,        # convert to meters
-                    })
+                # RASP engine data is space-delimited
+                fields = line.split(' ')
 
-                    # After we read the first data line, know the rest is thrust curve
-                    start_data = True
-                else:
-                    # Thrustcuve data:
-                    if any(char.isdigit() for char in line):
-                        fields = line.split(' ')
-                        time = float(fields[0].strip())
-                        thrust = float(fields[1].strip())
-                        self.engine.thrustcurve.append({'t': time, 'thrust': thrust})
+                # Fields are positional
+                self.engine.name = fields[0]
+                self.engine.manufacturer = fields[6].strip()
+                self.engine.m_prop = float(fields[4])
 
+                # build a "tank" the size of the solid motor
+                self.engine.tanks.append({
+                    "mass": float(fields[5]) - float(fields[4]),  # initial weight - propellent weight
+                    "length": float(fields[2]) / 1000.0,          # convert to meters
+                    "diameter": float(fields[1]) / 1000.0,        # convert to meters
+                })
+
+                # After we read the first data line, know the rest is thrust curve
+                start_data = True
         self.engine.comments = comments
         return self.engine
 
@@ -120,7 +119,7 @@ class RockSimEngine(FilelikeLoader):
                 # grab number out of XML
                 val = float(rse.get(definition['key']))
                 # convert to MKS
-                val = val * definition.get('convert', 1)  # default to 1 for no conversion factor
+                val *= definition.get('convert', 1)
                 rse_dict[definition['name']] = val
             else:
                 rse_dict[definition['name']] = rse.get(definition['key'])
@@ -209,38 +208,37 @@ class Openrocket(object):
                     nose.shape = rdoc.Noseshape.TANGENT_OGIVE
                 elif 'cone' in shape_str.lower():
                     nose.shape = rdoc.Noseshape.CONE
-            if element.tag == 'shapeparameter':
-                nose.shape_parameter = float(element.text)
             if element.tag == 'length':
                 nose.length = float(element.text)
-            if element.tag == 'thickness':
+            elif element.tag == 'shapeparameter':
+                nose.shape_parameter = float(element.text)
+            elif element.tag == 'thickness':
                 nose.thickness = float(element.text)
             if element.tag == 'finish':
                 nose.surface_roughness = self._read_surface(element.text)
-            if element.tag == 'aftradius':
-                if 'auto' not in element.text:
-                    self.radius = float(element.text)
+            if element.tag == 'aftradius' and 'auto' not in element.text:
+                self.radius = float(element.text)
             if element.tag == 'material':
                 nose.material_name = element.text
                 nose.density = float(element.get('density', 0))
             if element.tag == 'color':
                 nose.color = self._read_color(element)
             if element.tag == 'linestyle':
-                nose.add_class_tag("OpenRocket", "linestyle:"+element.text)
+                nose.add_class_tag("OpenRocket", f"linestyle:{element.text}")
             if element.tag == 'aftshoulderradius':
                 if self.radius is None:
                     self.radius = 0
                 self.radius += float(element.text)
-                nose.add_class_tag("OpenRocket", "aftshoulderradius:"+element.text)
+                nose.add_class_tag("OpenRocket", f"aftshoulderradius:{element.text}")
             if element.tag == 'aftshoulderlength':
-                nose.add_class_tag("OpenRocket", "aftshoulderlength:"+element.text)
+                nose.add_class_tag("OpenRocket", f"aftshoulderlength:{element.text}")
             if element.tag == 'aftshoulderthickness':
                 if self.radius is None:
                     self.radius = 0
                 self.radius += (float(element.text) * 2.0)
-                nose.add_class_tag("OpenRocket", "aftshoulderthickness:"+element.text)
+                nose.add_class_tag("OpenRocket", f"aftshoulderthickness:{element.text}")
             if element.tag == 'aftshouldercapped':
-                nose.add_class_tag("OpenRocket", "aftshouldercapped:"+element.text)
+                nose.add_class_tag("OpenRocket", f"aftshouldercapped:{element.text}")
 
         if self.radius is not None:
             nose.diameter = self.radius * 2.0
@@ -252,11 +250,11 @@ class Openrocket(object):
 
         # Read data
         for element in tree:
-            if element.tag == 'name':
-                tube.name = element.text
             if element.tag == 'length':
                 tube.length = float(element.text)
-            if element.tag == 'thickness':
+            elif element.tag == 'name':
+                tube.name = element.text
+            elif element.tag == 'thickness':
                 tube.thickness = float(element.text)
             if element.tag == 'finish':
                 tube.surface_roughness = self._read_surface(element.text)
@@ -265,9 +263,8 @@ class Openrocket(object):
                 tube.density = float(element.get('density', 0))
             if element.tag == 'color':
                 tube.color = self._read_color(element)
-            if element.tag == 'radius':
-                if 'auto' not in element.text:
-                    self.radius = float(element.text)
+            if element.tag == 'radius' and 'auto' not in element.text:
+                self.radius = float(element.text)
 
         if self.radius is not None:
             tube.diameter = self.radius * 2.0
@@ -286,16 +283,16 @@ class Openrocket(object):
         mass = rdoc.Mass('mass', 0)
 
         for element in tree:
-            if element.tag == 'name':
-                mass.name = element.text
             if element.tag == 'mass':
                 mass.mass = float(element.text)
-            if element.tag == 'position':
-                mass.center = float(element.text)
-            if element.tag == 'packedlength':
+            elif element.tag == 'name':
+                mass.name = element.text
+            elif element.tag == 'packedlength':
                 mass.length = float(element.text)
-            if element.tag == 'packedradius':
+            elif element.tag == 'packedradius':
                 mass.diameter = 2 * float(element.text)
+            elif element.tag == 'position':
+                mass.center = float(element.text)
             if element.tag == 'color':
                 mass.color = self._read_color(element)
 
@@ -314,16 +311,16 @@ class Openrocket(object):
         for element in tree:
             if element.tag == 'name':
                 mass.name = element.text
-            if element.tag == 'position':
-                mass.center = float(element.text)
-            if element.tag == 'packedlength':
+            elif element.tag == 'packedlength':
                 mass.length = float(element.text)
-            if element.tag == 'packedradius':
+            elif element.tag == 'packedradius':
                 mass.diameter = 2 * float(element.text)
+            elif element.tag == 'position':
+                mass.center = float(element.text)
             if element.tag == 'color':
                 mass.color = self._read_color(element)
             if element.tag == 'linestyle':
-                mass.add_class_tag("OpenRocket", "linestyle:"+element.text)
+                mass.add_class_tag("OpenRocket", f"linestyle:{element.text}")
 
         # Record the original OpenRocket type as a tag
         mass.add_class_tag("OpenRocket", "type:streamer")
@@ -331,9 +328,7 @@ class Openrocket(object):
         return mass
 
     def _load_fins(self, tree):
-        fins = rdoc.Fin('fin')
-
-        return fins
+        return rdoc.Fin('fin')
 
     def _load_finset(self, tree):
         fin = rdoc.Fin('Fin', 0, 0, 0)
@@ -341,28 +336,26 @@ class Openrocket(object):
         number_of_fins = 0
 
         for element in tree:
-            if element.tag == 'name':
-                name = element.text
-            if element.tag == 'rootchord':
-                fin.root = float(element.text)
-            if element.tag == 'tipchord':
-                fin.tip = float(element.text)
-            if element.tag == 'height':
-                fin.span = float(element.text)
-            if element.tag == 'sweeplength':
-                fin.sweep = float(element.text)
-            if element.tag == 'material':
-                fin.material_name = element.text
-            if element.tag == 'thickness':
-                fin.thickness = float(element.text)
             if element.tag == 'fincount':
                 number_of_fins = int(element.text)
+            elif element.tag == 'height':
+                fin.span = float(element.text)
+            elif element.tag == 'material':
+                fin.material_name = element.text
+            elif element.tag == 'name':
+                name = element.text
+            elif element.tag == 'rootchord':
+                fin.root = float(element.text)
+            elif element.tag == 'sweeplength':
+                fin.sweep = float(element.text)
+            elif element.tag == 'thickness':
+                fin.thickness = float(element.text)
+            elif element.tag == 'tipchord':
+                fin.tip = float(element.text)
             if element.tag == 'color':
                 fin.color = self._read_color(element)
 
-        finset = rdoc.Finset(name, fin, number_of_fins)
-
-        return finset
+        return rdoc.Finset(name, fin, number_of_fins)
 
     def _subcomponent_walk(self, tree):
         """My mom always said, never loop when you can recurse"""
@@ -375,11 +368,11 @@ class Openrocket(object):
 
                 for element in subcomponent:
                     if element.tag == 'subcomponents':
-                        component.components = [sub for sub in self._subcomponent_walk(element)]
+                        component.components = list(self._subcomponent_walk(element))
 
                 yield component
             elif subcomponent.tag == 'subcomponents':
-                yield [sub for sub in self._subcomponent_walk(subcomponent)]
+                yield list(self._subcomponent_walk(subcomponent))
 
     def load(self, filename):
         """Read an OpenRocket file"""
@@ -415,7 +408,7 @@ class Openrocket(object):
                                         stage.name = stage_parts.text
                                     if stage_parts.tag == 'subcomponents':
                                         # Recurse down through all components
-                                        stage.components = [part for part in self._subcomponent_walk(stage_parts)]
+                                        stage.components = list(self._subcomponent_walk(stage_parts))
 
                                 # Append to rocket
                                 ordoc.stages.append(stage)
